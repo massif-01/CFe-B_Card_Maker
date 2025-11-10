@@ -609,12 +609,6 @@ def run():
     # 拷贝dev模式配置文件
     copy_dev_config_files(config['disk_path'], vram, selected_model['full_name'])
     
-    # 询问是否添加模型优化与推理加速配置文件
-    need_optimization_config = ask_optimization_config()
-    if need_optimization_config:
-        # 拷贝fused_moe配置文件
-        copy_fused_moe_config(config['disk_path'], vram, selected_model['full_name'])
-    
     # 存储卡制作完成
     print("\n" + "="*50)
     print("存储卡制作完成！")
@@ -800,6 +794,104 @@ def check_root_permission():
         return True
 
 
+def scan_existing_models() -> List[str]:
+    """扫描/dev/sda2/llm下已存在的模型文件夹"""
+    mount_point = get_mount_point('/dev/sda2')
+    if not mount_point:
+        print("错误: /dev/sda2未挂载，请先挂载该分区")
+        return []
+    
+    llm_path = os.path.join(mount_point, 'llm')
+    if not os.path.exists(llm_path):
+        print(f"错误: 未找到模型目录: {llm_path}")
+        return []
+    
+    models = []
+    try:
+        for item in os.listdir(llm_path):
+            item_path = os.path.join(llm_path, item)
+            if os.path.isdir(item_path):
+                models.append(item)
+    except Exception as e:
+        print(f"扫描模型目录失败: {e}")
+        return []
+    
+    return models
+
+
+def add_optimization_config_standalone():
+    """独立添加模型优化与推理加速配置文件功能"""
+    print("\n" + "="*50)
+    print("添加模型优化与推理加速配置文件")
+    print("="*50)
+    
+    # 检查配置，需要disk_path来找到fused_moe文件夹
+    config = load_config()
+    if not config.get('disk_path'):
+        print("\n错误: 未进行系统设置，请先进行系统设置")
+        print("需要设置硬盘路径以找到fused_moe配置文件")
+        return
+    
+    # 扫描已存在的模型
+    print("\n正在扫描存储卡中已存在的模型...")
+    existing_models = scan_existing_models()
+    
+    if not existing_models:
+        print("未找到任何模型文件夹")
+        print("请确保 /dev/sda2/llm/ 目录下已有模型")
+        return
+    
+    print(f"\n找到 {len(existing_models)} 个模型:")
+    for i, model in enumerate(existing_models, 1):
+        print(f"  {i}. {model}")
+    
+    # 选择显存大小
+    print("\n请选择显存大小:")
+    print("1. 32G")
+    print("2. 48G")
+    print("3. 64G")
+    print("4. 128G")
+    
+    vram_map = {
+        '1': '32G',
+        '2': '48G',
+        '3': '64G',
+        '4': '128G'
+    }
+    
+    while True:
+        vram_choice = input("请输入选项 (1-4): ").strip()
+        if vram_choice in vram_map:
+            vram = vram_map[vram_choice]
+            break
+        print("无效选择，请输入1-4之间的数字")
+    
+    # 为每个模型添加配置文件
+    print(f"\n开始为 {len(existing_models)} 个模型添加优化配置文件（{vram}显存）...")
+    print("-" * 50)
+    
+    success_count = 0
+    failed_models = []
+    
+    for model_name in existing_models:
+        print(f"\n处理模型: {model_name}")
+        if copy_fused_moe_config(config['disk_path'], vram, model_name):
+            success_count += 1
+        else:
+            failed_models.append(model_name)
+    
+    # 显示结果
+    print("\n" + "="*50)
+    print("处理完成！")
+    print("="*50)
+    print(f"成功: {success_count}/{len(existing_models)} 个模型")
+    if failed_models:
+        print(f"失败: {len(failed_models)} 个模型")
+        print("失败的模型:")
+        for model in failed_models:
+            print(f"  - {model}")
+
+
 def main():
     """主函数"""
     # 检查root权限
@@ -811,15 +903,18 @@ def main():
         print("="*50)
         print("1. 系统设置")
         print("2. 运行")
-        print("3. 退出")
+        print("3. 添加模型优化与推理加速配置文件")
+        print("4. 退出")
         
-        choice = input("\n请选择功能 (1-3): ").strip()
+        choice = input("\n请选择功能 (1-4): ").strip()
         
         if choice == '1':
             system_settings()
         elif choice == '2':
             run()
         elif choice == '3':
+            add_optimization_config_standalone()
+        elif choice == '4':
             print("感谢使用！")
             # 卸载磁盘
             unmount_sda()
