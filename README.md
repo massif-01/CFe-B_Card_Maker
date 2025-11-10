@@ -19,7 +19,7 @@ A comprehensive Linux-based tool for creating RM-01 CFe-B storage cards with aut
    - Auto-detect manufacturer and model names
    - Save configuration to `config.json` for persistence
 
-2. **Card Creation Process**
+2. **Create Model Card**
    - Check three partitions on `/dev/sda` (rm01rootfs, rm01models, rm01app)
    - Backend selection:
      - FlashAttention: Copy Attention folder to `/dev/sda1/home/rm01/autoShell`
@@ -29,7 +29,11 @@ A comprehensive Linux-based tool for creating RM-01 CFe-B storage cards with aut
    - Model selection and deployment
    - Copy models to `/dev/sda2/llm` with progress bar
    - Optional dev mode configuration file generation (VRAM: 32G/48G/64G/128G)
-   - Optional optimization and inference acceleration configuration
+
+3. **Add Model Optimization Config**
+   - Automatically scan existing models in `/dev/sda2/llm/`
+   - Select VRAM size (32G/48G/64G/128G)
+   - Automatically add optimization and inference acceleration configuration files for all detected models
 
 ### Installation
 
@@ -57,14 +61,18 @@ python3 main.py
    - Program automatically scans `Models_download` folder and parses model list
    - Configuration saved to `config.json` for future use
 
-2. **Create Storage Card**: Select "2. Run"
+2. **Create Model Card**: Select "2. Create Model Card"
    - Program checks three partitions on `/dev/sda`
    - Select backend type (1/2/3)
    - Select model manufacturer (1-6)
    - Select specific model
    - Program automatically copies files with progress display
    - Optionally generate dev mode configuration files
-   - Optionally add optimization and inference acceleration configuration
+
+3. **Add Model Optimization Config**: Select "3. Add Model Optimization Config"
+   - Program automatically scans existing models in `/dev/sda2/llm/`
+   - Select VRAM size (1-4)
+   - Program automatically adds optimization configuration files for all detected models
 
 ### Requirements
 
@@ -119,7 +127,7 @@ Disk Root/
    - 自动识别厂商和模型名称
    - 保存配置到`config.json`文件（持久化）
 
-2. **存储卡制作流程**
+2. **制作模型卡**
    - 检查`/dev/sda`下的三个分区（rm01rootfs, rm01models, rm01app）
    - 后端类型选择：
      - FlashAttention：拷贝Attention文件夹到`/dev/sda1/home/rm01/autoShell`
@@ -129,7 +137,11 @@ Disk Root/
    - 模型选择和部署
    - 拷贝模型到`/dev/sda2/llm`（带进度条显示）
    - 可选生成dev模式配置文件（显存大小：32G/48G/64G/128G）
-   - 可选添加模型优化与推理加速配置文件
+
+3. **添加模型优化与推理加速配置文件**
+   - 自动扫描`/dev/sda2/llm/`下已存在的模型文件夹
+   - 选择显存大小（32G/48G/64G/128G）
+   - 自动为所有检测到的模型添加优化与推理加速配置文件
 
 ### 安装依赖
 
@@ -157,14 +169,18 @@ python3 main.py
    - 程序会自动扫描`Models_download`文件夹并解析模型列表
    - 配置会保存到`config.json`，下次启动无需重新设置
 
-2. **制作存储卡**：选择"2. 运行"
+2. **制作模型卡**：选择"2. 制作模型卡"
    - 程序会检查`/dev/sda`下的三个分区
    - 选择后端类型（1/2/3）
    - 选择模型厂商（1-6）
    - 选择具体模型
    - 程序会自动拷贝文件并显示进度
    - 可选择是否生成dev模式配置文件
-   - 可选择是否添加模型优化与推理加速配置文件
+
+3. **添加模型优化与推理加速配置文件**：选择"3. 添加模型优化与推理加速配置文件"
+   - 程序自动扫描`/dev/sda2/llm/`下已存在的模型文件夹
+   - 选择显存大小（1-4）
+   - 程序自动为所有检测到的模型添加优化配置文件
 
 ### 系统要求
 
