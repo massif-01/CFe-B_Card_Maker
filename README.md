@@ -226,8 +226,8 @@ python3 main.py
 
 ### License
 
-<<<<<<< HEAD
-本项目采用 Apache2.0 许可证。
-=======
 This project is licensed under the Apache License 2.0. See the [LICENSE](LICENSE) file for details.
->>>>>>> 3e0ed0b (Update README: 更新许可证信息为Apache 2.0)
+
+### 许可证
+
+本项目采用 Apache License 2.0 许可证。详情请参阅 [LICENSE](LICENSE) 文件。
