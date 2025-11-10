@@ -898,13 +898,25 @@ def main():
     check_root_permission()
     
     while True:
-        print("\n" + "="*50)
+        # 显示Logo
+        print("\n")
+        print("    ██████╗ ███╗   ███╗██╗███╗   ██╗████████╗███████╗")
+        print("    ██╔══██╗████╗ ████║██║████╗  ██║╚══██╔══╝██╔════╝")
+        print("    ██████╔╝██╔████╔██║██║██╔██╗ ██║   ██║   █████╗  ")
+        print("    ██╔══██╗██║╚██╔╝██║██║██║╚██╗██║   ██║   ██╔══╝  ")
+        print("    ██║  ██║██║ ╚═╝ ██║██║██║ ╚████║   ██║   ███████╗")
+        print("    ╚═╝  ╚═╝╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝   ╚═╝   ╚══════╝")
+        print("")
+        print("\n" + "-"*50)
         print("RM-01 CFe-B存储卡制作工具")
-        print("="*50)
-        print("1. 系统设置")
-        print("2. 运行")
-        print("3. 添加模型优化与推理加速配置文件")
-        print("4. 退出")
+        print("RM-01 CFe-B Card Maker Tool")
+        print("-"*50)
+        print("Copyright RMinte 泛灵人工智能")
+        print("-"*50)
+        print("1. 系统设置 / System Settings")
+        print("2. 添加模型 / Add Model")
+        print("3. 添加模型优化与推理加速配置文件 / Add Model Optimization Config")
+        print("4. 退出 / Exit")
         
         choice = input("\n请选择功能 (1-4): ").strip()
         
