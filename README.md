@@ -226,4 +226,4 @@ python3 main.py
 
 ### 许可证
 
-本项目采用MIT许可证。
+本项目采用 Apache2.0 许可证。
