@@ -114,7 +114,7 @@ def scan_models(base_path: str) -> List[Dict]:
                 'full_name': item,
                 'path': item_path
             })
-            print(f"  发现模型: {manufacturer} - {model_name}")
+            print(f"  发现模型: {item}")
     
     return models
 
@@ -376,7 +376,7 @@ def select_model(models: List[Dict]) -> Optional[Dict]:
     
     print("\n=== 请选择模型 ===")
     for i, model in enumerate(models, 1):
-        print(f"{i}. {model['manufacturer']} - {model['model_name']}")
+        print(f"{i}. {model['full_name']}")
     
     while True:
         try:
