@@ -72,27 +72,41 @@ def scan_models(base_path: str) -> List[Dict]:
     
     print(f"\n正在扫描模型文件夹: {models_path}")
     
+    # 已知厂商列表（用于识别模型文件夹名中的厂商）
+    known_manufacturers = ['Qwen', 'GPT', 'Llama', 'DeepSeek', 'Gemma', 'ChatGLM', 'Baichuan', 'InternLM']
+    
     # 遍历Models_download下的所有文件夹
     for item in os.listdir(models_path):
         item_path = os.path.join(models_path, item)
         if os.path.isdir(item_path):
-            # 解析文件夹名：第一个单词是厂商，后面是模型名
-            # 优先使用下划线，如果没有则使用连字符
-            if '_' in item:
-                parts = item.split('_', 1)  # 使用下划线分割，最多分割一次
-            elif '-' in item:
-                parts = item.split('-', 1)  # 使用连字符分割，最多分割一次
-            else:
-                # 如果都没有，整个作为模型名，厂商为Others
-                parts = None
+            manufacturer = None
+            model_name = None
             
-            if parts and len(parts) >= 2:
-                manufacturer = parts[0]
-                model_name = parts[1]
-            else:
-                # 如果都没有分隔符，整个作为模型名，厂商为Others
-                manufacturer = 'Others'
-                model_name = item
+            # 方法1: 检查是否以已知厂商开头
+            for mfg in known_manufacturers:
+                if item.startswith(mfg):
+                    manufacturer = mfg
+                    # 提取模型名：去掉厂商名和后面的分隔符（下划线或连字符）
+                    remaining = item[len(mfg):].lstrip('_-')
+                    model_name = remaining if remaining else item
+                    break
+            
+            # 方法2: 如果没有匹配到已知厂商，尝试用分隔符分割
+            if manufacturer is None:
+                if '_' in item:
+                    parts = item.split('_', 1)  # 使用下划线分割，最多分割一次
+                elif '-' in item:
+                    parts = item.split('-', 1)  # 使用连字符分割，最多分割一次
+                else:
+                    parts = None
+                
+                if parts and len(parts) >= 2:
+                    manufacturer = parts[0]
+                    model_name = parts[1]
+                else:
+                    # 如果都没有分隔符，整个作为模型名，厂商为Others
+                    manufacturer = 'Others'
+                    model_name = item
             
             models.append({
                 'manufacturer': manufacturer,

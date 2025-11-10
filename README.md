@@ -105,7 +105,10 @@ Disk Root/
 
 ### Notes
 
-- Model folder naming format: `Manufacturer_ModelName` (underscore separator)
+- Model folder naming: The program automatically recognizes manufacturer names (Qwen, GPT, Llama, DeepSeek, Gemma, etc.) from folder names. Examples:
+  - `Qwen3-VL-8B-Instruct-FP8-Static` → Manufacturer: Qwen, Model: 3-VL-8B-Instruct-FP8-Static
+  - `Qwen_ChatGLM-7B` → Manufacturer: Qwen, Model: ChatGLM-7B
+  - Folders can use underscore (`_`) or hyphen (`-`) as separators, or just start with manufacturer name
 - For auto-detection mode, ensure `/dev/sda2/98autoshell/backend_list.yaml` exists
 - Configuration file saved in `config.json` in program directory
 - Program automatically unmounts `/dev/sda` partitions on exit
@@ -213,7 +216,10 @@ python3 main.py
 
 ### 注意事项
 
-- 模型文件夹命名格式应为：`厂商_模型名`（使用下划线分隔）
+- 模型文件夹命名：程序会自动识别文件夹名中的厂商名称（Qwen、GPT、Llama、DeepSeek、Gemma等）。示例：
+  - `Qwen3-VL-8B-Instruct-FP8-Static` → 厂商：Qwen，模型：3-VL-8B-Instruct-FP8-Static
+  - `Qwen_ChatGLM-7B` → 厂商：Qwen，模型：ChatGLM-7B
+  - 文件夹可以使用下划线（`_`）或连字符（`-`）作为分隔符，或者直接以厂商名开头
 - 如果选择自动适配，需要确保`/dev/sda2/98autoshell/backend_list.yaml`文件存在
 - 配置文件保存在程序目录下的`config.json`文件中
 - 程序退出时会自动卸载`/dev/sda`分区
