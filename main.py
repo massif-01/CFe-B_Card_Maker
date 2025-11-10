@@ -549,14 +549,7 @@ def run():
             break
         print("无效选择，请输入1-3之间的数字")
     
-    if backend_choice == '3':
-        # 自动适配，需要先选择模型
-        pass
-    elif backend_choice in ['1', '2']:
-        # 直接拷贝对应的后端
-        if not copy_backend(backend_choice, config):
-            return
-    
+    # 先选择厂商和模型
     # 选择厂商
     manufacturer = select_manufacturer()
     
@@ -572,8 +565,9 @@ def run():
     if not selected_model:
         return
     
-    # 如果是自动适配，现在确定后端
+    # 根据后端选择拷贝后端文件
     if backend_choice == '3':
+        # 自动适配：根据模型确定后端
         backend_type = auto_detect_backend(selected_model['model_name'], config)
         if backend_type:
             print(f"\n自动检测到后端类型: {backend_type}")
@@ -584,6 +578,10 @@ def run():
                 copy_backend('2', config)
         else:
             print("无法自动检测后端类型，请手动选择")
+            return
+    elif backend_choice in ['1', '2']:
+        # 用户手动选择的后端：直接拷贝对应的后端
+        if not copy_backend(backend_choice, config):
             return
     
     # 拷贝模型
