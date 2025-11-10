@@ -24,7 +24,8 @@ MANUFACTURERS = {
     '3': 'Llama',
     '4': 'DeepSeek',
     '5': 'Gemma',
-    '6': 'Others'
+    '6': 'ZhipuAI',
+    '7': 'Others'
 }
 
 
@@ -82,14 +83,20 @@ def scan_models(base_path: str) -> List[Dict]:
             manufacturer = None
             model_name = None
             
+            # 方法0: 检查是否包含GLM，归类到ZhipuAI
+            if 'GLM' in item.upper():
+                manufacturer = 'ZhipuAI'
+                model_name = item
+            
             # 方法1: 检查是否以已知厂商开头
-            for mfg in known_manufacturers:
-                if item.startswith(mfg):
-                    manufacturer = mfg
-                    # 提取模型名：去掉厂商名和后面的分隔符（下划线或连字符）
-                    remaining = item[len(mfg):].lstrip('_-')
-                    model_name = remaining if remaining else item
-                    break
+            if manufacturer is None:
+                for mfg in known_manufacturers:
+                    if item.startswith(mfg):
+                        manufacturer = mfg
+                        # 提取模型名：去掉厂商名和后面的分隔符（下划线或连字符）
+                        remaining = item[len(mfg):].lstrip('_-')
+                        model_name = remaining if remaining else item
+                        break
             
             # 方法2: 如果没有匹配到已知厂商，尝试用分隔符分割
             if manufacturer is None:
@@ -346,20 +353,22 @@ def select_manufacturer() -> str:
         print(f"{key}. {value}")
     
     while True:
-        choice = input("\n请输入选项 (1-6): ").strip()
+        choice = input("\n请输入选项 (1-7): ").strip()
         if choice in MANUFACTURERS:
             return MANUFACTURERS[choice]
-        print("无效选择，请输入1-6之间的数字")
+        print("无效选择，请输入1-7之间的数字")
 
 
 def filter_models_by_manufacturer(manufacturer: str, models: List[Dict]) -> List[Dict]:
     """根据厂商过滤模型"""
     filtered = []
+    known_manufacturers = ['Qwen', 'GPT', 'Llama', 'DeepSeek', 'Gemma', 'ZhipuAI']
+    
     for model in models:
         model_manufacturer = model['manufacturer']
         # 如果厂商匹配，或者用户选择了Others且模型不在已知厂商列表中
         if manufacturer == 'Others':
-            if model_manufacturer not in ['Qwen', 'GPT', 'Llama', 'DeepSeek', 'Gemma']:
+            if model_manufacturer not in known_manufacturers:
                 filtered.append(model)
         else:
             if model_manufacturer == manufacturer:
