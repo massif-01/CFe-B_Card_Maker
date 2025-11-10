@@ -224,6 +224,10 @@ python3 main.py
 - 配置文件保存在程序目录下的`config.json`文件中
 - 程序退出时会自动卸载`/dev/sda`分区
 
-### 许可证
+### License
 
+<<<<<<< HEAD
 本项目采用 Apache2.0 许可证。
+=======
+This project is licensed under the Apache License 2.0. See the [LICENSE](LICENSE) file for details.
+>>>>>>> 3e0ed0b (Update README: 更新许可证信息为Apache 2.0)
