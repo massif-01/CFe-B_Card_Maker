@@ -914,7 +914,7 @@ def main():
         print("Copyright RMinte 泛灵人工智能")
         print("-"*50)
         print("1. 系统设置 / System Settings")
-        print("2. 添加模型 / Add Model")
+        print("2. 制作模型卡 / Create Model Card")
         print("3. 添加模型优化与推理加速配置文件 / Add Model Optimization Config")
         print("4. 退出 / Exit")
         
