@@ -899,20 +899,61 @@ def copy_auto_and_dev_folders(config: Dict) -> bool:
         print(f"  目标: {dst_folder}")
         
         try:
-            # 如果目标文件夹已存在，先删除
-            if os.path.exists(dst_folder):
-                shutil.rmtree(dst_folder)
-            
-            # 拷贝文件夹
-            copy_with_progress(src_folder, dst_folder, f"拷贝 {folder_name}")
-            print(f"  ✓ {folder_name} 拷贝完成")
-            success_count += 1
+            # 特殊处理dev文件夹：只拷贝缺失的子文件夹，不删除整个dev文件夹
+            # 这样可以保留用户已经拷贝到dev/llm下的模型
+            if folder_name == 'dev':
+                # 检查dev/llm是否存在，如果存在则警告
+                llm_path = os.path.join(dst_folder, 'llm')
+                if os.path.exists(llm_path):
+                    print(f"  ⚠ 警告: 检测到 {llm_path} 已存在，将保留其中的模型")
+                
+                # 只拷贝dev文件夹下的子文件夹（embedding, reranker等），不删除整个dev文件夹
+                if os.path.exists(dst_folder):
+                    # 如果dev文件夹已存在，只拷贝缺失的子文件夹
+                    for item in os.listdir(src_folder):
+                        src_item = os.path.join(src_folder, item)
+                        dst_item = os.path.join(dst_folder, item)
+                        
+                        # 如果是llm文件夹，跳过（保留用户已拷贝的模型）
+                        if item == 'llm':
+                            print(f"  ⚠ 跳过 {item} 文件夹（保留现有内容）")
+                            continue
+                        
+                        if os.path.isdir(src_item):
+                            # 如果目标子文件夹已存在，先删除再拷贝
+                            if os.path.exists(dst_item):
+                                print(f"  ⚠ 覆盖 {item} 文件夹")
+                                shutil.rmtree(dst_item)
+                            copy_with_progress(src_item, dst_item, f"拷贝 {folder_name}/{item}")
+                            print(f"  ✓ {folder_name}/{item} 拷贝完成")
+                        elif os.path.isfile(src_item):
+                            # 拷贝文件
+                            if os.path.exists(dst_item):
+                                os.remove(dst_item)
+                            copy_with_progress(src_item, dst_item, f"拷贝 {folder_name}/{item}")
+                            print(f"  ✓ {folder_name}/{item} 拷贝完成")
+                else:
+                    # 如果dev文件夹不存在，直接拷贝整个文件夹
+                    copy_with_progress(src_folder, dst_folder, f"拷贝 {folder_name}")
+                    print(f"  ✓ {folder_name} 拷贝完成")
+                success_count += 1
+            else:
+                # 对于auto文件夹，正常删除和拷贝
+                if os.path.exists(dst_folder):
+                    shutil.rmtree(dst_folder)
+                
+                # 拷贝文件夹
+                copy_with_progress(src_folder, dst_folder, f"拷贝 {folder_name}")
+                print(f"  ✓ {folder_name} 拷贝完成")
+                success_count += 1
         except PermissionError:
             print(f"  ✗ 权限不足，无法拷贝 {folder_name}")
             print("  请使用 sudo 运行程序：sudo python3 main.py")
             failed_folders.append(folder_name)
         except Exception as e:
             print(f"  ✗ 拷贝 {folder_name} 失败: {e}")
+            import traceback
+            traceback.print_exc()
             failed_folders.append(folder_name)
     
     if success_count == len(folders_to_copy):
@@ -1388,13 +1429,9 @@ def run():
         print("\n" + "="*50)
         print("存储卡制作完成！")
         print("="*50)
-        print("\n请选择操作：")
-        print("0. 返回主菜单")
-        while True:
-            choice = input("> ").strip()
-            if choice == '0':
-                return
-            print("请输入0返回主菜单")
+        print("\n按回车键返回主菜单...")
+        input()
+        return
     
     # 拷贝dev模式配置文件
     if not copy_dev_config_files(config['disk_path'], vram, selected_model['full_name']):
@@ -1406,13 +1443,8 @@ def run():
     print("\n" + "="*50)
     print("存储卡制作完成！")
     print("="*50)
-    print("\n请选择操作：")
-    print("0. 返回主菜单")
-    while True:
-        choice = input("> ").strip()
-        if choice == '0':
-            return
-        print("请输入0返回主菜单")
+    print("\n按回车键返回主菜单...")
+    input()
 
 
 def ask_optimization_config() -> bool:
@@ -1753,13 +1785,8 @@ def add_optimization_config_standalone():
         for model in failed_models:
             print(f"  - {model}")
     
-    print("\n请选择操作：")
-    print("0. 返回主菜单")
-    while True:
-        choice = input("> ").strip()
-        if choice == '0':
-            return
-        print("请输入0返回主菜单")
+    print("\n按回车键返回主菜单...")
+    input()
 
 
 def scan_rag_models(disk_path: str, model_type: str) -> List[str]:
