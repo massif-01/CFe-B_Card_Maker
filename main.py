@@ -62,13 +62,30 @@ def show_lsblk():
         print("错误: 未找到lsblk命令，请确保在Linux系统上运行")
 
 
+def find_models_download_path(base_path: str) -> Optional[str]:
+    """查找Models_download或Models_Download文件夹路径（适配大小写）
+    
+    Args:
+        base_path: 基础路径
+    
+    Returns:
+        Optional[str]: 找到的文件夹路径，如果不存在返回None
+    """
+    possible_names = ['Models_download', 'Models_Download']
+    for name in possible_names:
+        path = os.path.join(base_path, name)
+        if os.path.exists(path):
+            return path
+    return None
+
+
 def scan_models(base_path: str) -> List[Dict]:
     """扫描Models_download文件夹，解析模型列表"""
     models = []
-    models_path = os.path.join(base_path, 'Models_download')
+    models_path = find_models_download_path(base_path)
     
-    if not os.path.exists(models_path):
-        print(f"错误: 未找到Models_download文件夹: {models_path}")
+    if not models_path:
+        print(f"错误: 未找到Models_download或Models_Download文件夹")
         return models
     
     print(f"\n正在扫描模型文件夹: {models_path}")
@@ -561,48 +578,58 @@ def get_mount_point(device: str) -> Optional[str]:
 
 def copy_with_progress(src: str, dst: str, description: str = "复制"):
     """带进度条的文件/文件夹复制"""
-    if os.path.isfile(src):
-        # 单文件复制
-        total_size = os.path.getsize(src)
-        os.makedirs(os.path.dirname(dst), exist_ok=True)
-        with open(src, 'rb') as fsrc, open(dst, 'wb') as fdst, \
-             tqdm(total=total_size, unit='B', unit_scale=True, desc=description) as pbar:
-            while True:
-                chunk = fsrc.read(8192)
-                if not chunk:
-                    break
-                fdst.write(chunk)
-                pbar.update(len(chunk))
-    else:
-        # 文件夹复制
-        files = []
-        for root, dirs, filenames in os.walk(src):
-            for filename in filenames:
-                files.append(os.path.join(root, filename))
-        
-        if not files:
-            # 空文件夹
+    try:
+        if os.path.isfile(src):
+            # 单文件复制
+            total_size = os.path.getsize(src)
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            with open(src, 'rb') as fsrc, open(dst, 'wb') as fdst, \
+                 tqdm(total=total_size, unit='B', unit_scale=True, desc=description) as pbar:
+                while True:
+                    chunk = fsrc.read(8192)
+                    if not chunk:
+                        break
+                    fdst.write(chunk)
+                    pbar.update(len(chunk))
+        else:
+            # 文件夹复制
+            files = []
+            for root, dirs, filenames in os.walk(src):
+                for filename in filenames:
+                    files.append(os.path.join(root, filename))
+            
+            if not files:
+                # 空文件夹
+                os.makedirs(dst, exist_ok=True)
+                return
+            
+            total_size = sum(os.path.getsize(f) for f in files)
+            
+            # 确保目标目录存在
             os.makedirs(dst, exist_ok=True)
-            return
-        
-        total_size = sum(os.path.getsize(f) for f in files)
-        
-        # 确保目标目录存在
-        os.makedirs(dst, exist_ok=True)
-        
-        with tqdm(total=total_size, unit='B', unit_scale=True, desc=description) as pbar:
-            for src_file in files:
-                rel_path = os.path.relpath(src_file, src)
-                dst_file = os.path.join(dst, rel_path)
-                os.makedirs(os.path.dirname(dst_file), exist_ok=True)
-                
-                with open(src_file, 'rb') as fsrc, open(dst_file, 'wb') as fdst:
-                    while True:
-                        chunk = fsrc.read(8192)
-                        if not chunk:
-                            break
-                        fdst.write(chunk)
-                        pbar.update(len(chunk))
+            
+            with tqdm(total=total_size, unit='B', unit_scale=True, desc=description) as pbar:
+                for src_file in files:
+                    rel_path = os.path.relpath(src_file, src)
+                    dst_file = os.path.join(dst, rel_path)
+                    os.makedirs(os.path.dirname(dst_file), exist_ok=True)
+                    
+                    try:
+                        with open(src_file, 'rb') as fsrc, open(dst_file, 'wb') as fdst:
+                            while True:
+                                chunk = fsrc.read(8192)
+                                if not chunk:
+                                    break
+                                fdst.write(chunk)
+                                pbar.update(len(chunk))
+                    except Exception as e:
+                        print(f"\n错误: 拷贝文件失败 {src_file} -> {dst_file}: {e}")
+                        raise
+    except Exception as e:
+        print(f"\n错误: copy_with_progress失败: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
 
 
 def get_target_cfeb_device() -> Optional[str]:
@@ -804,8 +831,107 @@ def select_model(models: List[Dict]) -> Optional[Dict]:
             print("请输入有效的数字")
 
 
+def copy_auto_and_dev_folders(config: Dict) -> bool:
+    """从母版卡的tree文件夹拷贝auto和dev文件夹到目标CFe-B卡的models分区
+    
+    Args:
+        config: 配置字典，包含disk_path（母版卡路径）
+    
+    Returns:
+        bool: 是否成功
+    """
+    disk_path = config.get('disk_path', '')
+    if not disk_path:
+        print("错误: 未设置硬盘路径，请先进行系统设置")
+        print("\n按回车键返回主菜单...")
+        input()
+        return False
+    
+    # 获取目标CFe-B卡设备
+    target_device = get_target_cfeb_device()
+    if not target_device:
+        print("错误: 未设置目标CFe-B卡，请先进行系统设置")
+        print("\n按回车键返回主菜单...")
+        input()
+        return False
+    
+    # 获取目标CFe-B卡第二个分区的挂载点（models分区）
+    mount_point = get_mount_point(f'{target_device}2')
+    if not mount_point:
+        print(f"错误: {target_device}2未挂载，请先挂载该分区")
+        print("\n按回车键返回主菜单...")
+        input()
+        return False
+    
+    # 源路径：母版卡的tree文件夹
+    tree_path = os.path.join(disk_path, 'tree')
+    print(f"\n调试信息: 母版卡路径: {disk_path}")
+    print(f"调试信息: tree文件夹路径: {tree_path}")
+    print(f"调试信息: tree文件夹是否存在: {os.path.exists(tree_path)}")
+    
+    if not os.path.exists(tree_path):
+        print(f"错误: 未找到母版卡的tree文件夹: {tree_path}")
+        print("\n按回车键返回主菜单...")
+        input()
+        return False
+    
+    # 需要拷贝的文件夹
+    folders_to_copy = ['auto', 'dev']
+    
+    print(f"\n正在从母版卡拷贝auto和dev文件夹到目标CFe-B卡...")
+    print(f"源路径: {tree_path}")
+    print(f"目标路径: {mount_point}")
+    print("-" * 50)
+    
+    success_count = 0
+    failed_folders = []
+    
+    for folder_name in folders_to_copy:
+        src_folder = os.path.join(tree_path, folder_name)
+        dst_folder = os.path.join(mount_point, folder_name)
+        
+        if not os.path.exists(src_folder):
+            print(f"⚠ 警告: 源文件夹不存在，跳过: {src_folder}")
+            continue
+        
+        print(f"\n正在拷贝: {folder_name}")
+        print(f"  源: {src_folder}")
+        print(f"  目标: {dst_folder}")
+        
+        try:
+            # 如果目标文件夹已存在，先删除
+            if os.path.exists(dst_folder):
+                shutil.rmtree(dst_folder)
+            
+            # 拷贝文件夹
+            copy_with_progress(src_folder, dst_folder, f"拷贝 {folder_name}")
+            print(f"  ✓ {folder_name} 拷贝完成")
+            success_count += 1
+        except PermissionError:
+            print(f"  ✗ 权限不足，无法拷贝 {folder_name}")
+            print("  请使用 sudo 运行程序：sudo python3 main.py")
+            failed_folders.append(folder_name)
+        except Exception as e:
+            print(f"  ✗ 拷贝 {folder_name} 失败: {e}")
+            failed_folders.append(folder_name)
+    
+    if success_count == len(folders_to_copy):
+        print(f"\n✓ 所有文件夹拷贝完成！共 {success_count} 个文件夹")
+        return True
+    elif success_count > 0:
+        print(f"\n⚠ 部分文件夹拷贝完成！成功 {success_count}/{len(folders_to_copy)} 个文件夹")
+        if failed_folders:
+            print(f"失败的文件夹: {', '.join(failed_folders)}")
+        return True  # 即使部分失败也返回True，因为至少有一些文件夹拷贝成功了
+    else:
+        print("\n错误: 没有成功拷贝任何文件夹")
+        print("\n按回车键返回主菜单...")
+        input()
+        return False
+
+
 def copy_model(model: Dict):
-    """拷贝模型到目标CFe-B卡的models分区/llm"""
+    """拷贝模型到目标CFe-B卡的models分区/dev/llm"""
     src_path = model['path']
     
     # 获取目标CFe-B卡设备
@@ -824,7 +950,7 @@ def copy_model(model: Dict):
         input()
         return False
     
-    dst_path = os.path.join(mount_point, 'llm')
+    dst_path = os.path.join(mount_point, 'dev', 'llm')
     
     # 检查挂载点是否可写
     if not os.access(mount_point, os.W_OK):
@@ -859,20 +985,53 @@ def copy_model(model: Dict):
     print(f"源: {src_path}")
     print(f"目标: {dst_path}")
     
+    # 目标模型文件夹路径
+    model_dst_path = os.path.join(dst_path, model['full_name'])
+    
+    # 调试信息
+    print(f"调试信息: 源路径是否存在: {os.path.exists(src_path)}")
+    print(f"调试信息: 源路径类型: {'文件' if os.path.isfile(src_path) else '文件夹' if os.path.isdir(src_path) else '不存在'}")
+    print(f"调试信息: 目标目录: {dst_path}")
+    print(f"调试信息: 目标目录是否存在: {os.path.exists(dst_path)}")
+    print(f"调试信息: 模型目标路径: {model_dst_path}")
+    
     try:
+        # 如果目标模型文件夹已存在，先删除（覆盖）
+        if os.path.exists(model_dst_path):
+            print(f"目标文件夹已存在，将覆盖: {model_dst_path}")
+            shutil.rmtree(model_dst_path)
+        
         # 使用进度条拷贝
-        copy_with_progress(src_path, os.path.join(dst_path, model['full_name']), 
+        print(f"\n开始拷贝...")
+        copy_with_progress(src_path, model_dst_path, 
                           f"拷贝模型 {model['full_name']}")
-        print("模型拷贝完成！")
-        return True
-    except PermissionError:
+        
+        # 验证拷贝结果
+        if os.path.exists(model_dst_path):
+            if os.path.isdir(model_dst_path):
+                file_count = sum(len(files) for _, _, files in os.walk(model_dst_path))
+                print(f"✓ 模型拷贝完成！目标路径: {model_dst_path}")
+                print(f"✓ 验证: 目录存在，包含 {file_count} 个文件")
+            else:
+                print(f"✓ 模型拷贝完成！目标路径: {model_dst_path}")
+                print(f"✓ 验证: 文件存在")
+            return True
+        else:
+            print(f"✗ 错误: 拷贝后目标路径不存在: {model_dst_path}")
+            print("\n按回车键返回主菜单...")
+            input()
+            return False
+    except PermissionError as e:
         print(f"\n错误: 权限不足，无法拷贝文件到 {dst_path}")
+        print(f"详细错误: {e}")
         print("请使用 sudo 运行程序：sudo python3 main.py")
         print("\n按回车键返回主菜单...")
         input()
         return False
     except Exception as e:
         print(f"拷贝失败: {e}")
+        import traceback
+        traceback.print_exc()
         print("\n按回车键返回主菜单...")
         input()
         return False
@@ -988,11 +1147,20 @@ def copy_dev_config_files(disk_path: str, vram: str, model_full_name: str) -> bo
     success_count = 0
     for filename, target_dir_name in config_files.items():
         src_file = os.path.join(model_config_folder, filename)
-        dst_dir = os.path.join(mount_point, 'dev', target_dir_name)
         
         if not os.path.exists(src_file):
             print(f"⚠ 警告: 未找到文件 {filename}，跳过")
             continue
+        
+        # 确定目标目录
+        # llm_run.yaml 需要拷贝到 dev/llm/ 目录下（直接在llm目录下）
+        # 其他文件拷贝到 dev/embedding 或 dev/reranker
+        if filename == 'llm_run.yaml':
+            # llm_run.yaml 拷贝到 dev/llm/ 目录下
+            dst_dir = os.path.join(mount_point, 'dev', 'llm')
+        else:
+            # 其他文件拷贝到对应的目录
+            dst_dir = os.path.join(mount_point, 'dev', target_dir_name)
         
         # 确保目标目录存在
         try:
@@ -1008,10 +1176,17 @@ def copy_dev_config_files(disk_path: str, vram: str, model_full_name: str) -> bo
         dst_file = os.path.join(dst_dir, filename)
         
         try:
+            # 如果目标文件已存在，先删除（覆盖）
+            if os.path.exists(dst_file):
+                os.remove(dst_file)
+            
             # 拷贝文件（使用进度条）
             copy_with_progress(src_file, dst_file, f"拷贝 {filename}")
             target_device = get_target_cfeb_device() or '/dev/sda'
-            print(f"✓ {filename} -> {target_device}2/dev/{target_dir_name}/{filename}")
+            if filename == 'llm_run.yaml':
+                print(f"✓ {filename} -> {target_device}2/dev/llm/{filename}")
+            else:
+                print(f"✓ {filename} -> {target_device}2/dev/{target_dir_name}/{filename}")
             success_count += 1
         except Exception as e:
             print(f"✗ 拷贝 {filename} 失败: {e}")
@@ -1129,6 +1304,11 @@ def run():
     
     # 验证目标CFe-B卡
     if not verify_target_cfeb_card():
+        return
+    
+    # 拷贝auto和dev文件夹（如果还没有）
+    print("\n正在检查并拷贝auto和dev文件夹...")
+    if not copy_auto_and_dev_folders(config):
         return
     
     # 选择后端类型（使用循环确保输入有效）
@@ -1356,6 +1536,9 @@ def copy_fused_moe_config(disk_path: str, vram: str, model_full_name: str) -> bo
             if os.path.isfile(src_item):
                 # 拷贝文件
                 try:
+                    # 如果目标文件已存在，先删除（覆盖）
+                    if os.path.exists(dst_item):
+                        os.remove(dst_item)
                     copy_with_progress(src_item, dst_item, f"拷贝 {item}")
                     copied_files.append(item)
                     print(f"✓ {item}")
@@ -1365,6 +1548,9 @@ def copy_fused_moe_config(disk_path: str, vram: str, model_full_name: str) -> bo
             elif os.path.isdir(src_item):
                 # 拷贝目录
                 try:
+                    # 如果目标目录已存在，先删除（覆盖）
+                    if os.path.exists(dst_item):
+                        shutil.rmtree(dst_item)
                     copy_with_progress(src_item, dst_item, f"拷贝目录 {item}")
                     copied_files.append(f"{item}/")
                     print(f"✓ {item}/")
@@ -1459,7 +1645,7 @@ def check_root_permission():
 
 
 def scan_existing_models() -> List[str]:
-    """扫描目标CFe-B卡的models分区/llm下已存在的模型文件夹"""
+    """扫描目标CFe-B卡的models分区/dev/llm下已存在的模型文件夹"""
     # 获取目标CFe-B卡设备
     target_device = get_target_cfeb_device()
     if not target_device:
@@ -1470,7 +1656,7 @@ def scan_existing_models() -> List[str]:
     if not mount_point:
         return []
     
-    llm_path = os.path.join(mount_point, 'llm')
+    llm_path = os.path.join(mount_point, 'dev', 'llm')
     if not os.path.exists(llm_path):
         return []
     
@@ -1508,7 +1694,7 @@ def add_optimization_config_standalone():
     if not existing_models:
         print("未找到任何模型文件夹")
         target_device = get_target_cfeb_device() or '/dev/sda'
-        print(f"请确保 {target_device}2/llm/ 目录下已有模型")
+        print(f"请确保 {target_device}2/dev/llm/ 目录下已有模型")
         print("\n请检查硬件连接或确保目标CFe-B卡已正确插入，按回车键返回主菜单...")
         input()
         return
@@ -1576,6 +1762,462 @@ def add_optimization_config_standalone():
         print("请输入0返回主菜单")
 
 
+def scan_rag_models(disk_path: str, model_type: str) -> List[str]:
+    """扫描母版卡中的Embedding或Reranker模型
+    
+    Args:
+        disk_path: 母版卡路径
+        model_type: 'embedding' 或 'reranker'
+    
+    Returns:
+        List[str]: 模型文件夹名称列表
+    """
+    if model_type == 'embedding':
+        search_folder = 'embedding'
+        keywords = ['Embedding', 'embedding']
+    elif model_type == 'reranker':
+        search_folder = 'reranker'
+        keywords = ['Rerank', 'Reranker', 'rerank', 'reranker']
+    else:
+        return []
+    
+    # 在Models_download或Models_Download下的embedding或reranker文件夹中查找
+    models_download_path = find_models_download_path(disk_path)
+    if not models_download_path:
+        return []
+    
+    target_folder = os.path.join(models_download_path, search_folder)
+    if not os.path.exists(target_folder):
+        return []
+    
+    models = []
+    try:
+        for item in os.listdir(target_folder):
+            item_path = os.path.join(target_folder, item)
+            if os.path.isdir(item_path):
+                # 检查文件夹名称是否包含关键词
+                if any(keyword in item for keyword in keywords):
+                    models.append(item)
+    except Exception:
+        return []
+    
+    return models
+
+
+def copy_rag_model(model_type: str, model_name: str, config: Dict) -> bool:
+    """拷贝RAG模型到目标CFe-B卡
+    
+    Args:
+        model_type: 'embedding' 或 'reranker'
+        model_name: 模型文件夹名称
+        config: 配置字典
+    
+    Returns:
+        bool: 是否成功
+    """
+    disk_path = config.get('disk_path', '')
+    if not disk_path:
+        print("错误: 未设置硬盘路径，请先进行系统设置")
+        print("\n按回车键返回主菜单...")
+        input()
+        return False
+    
+    # 获取目标CFe-B卡设备
+    target_device = get_target_cfeb_device()
+    if not target_device:
+        print("错误: 未设置目标CFe-B卡，请先进行系统设置")
+        print("\n按回车键返回主菜单...")
+        input()
+        return False
+    
+    # 获取目标CFe-B卡第二个分区的挂载点（models分区）
+    mount_point = get_mount_point(f'{target_device}2')
+    if not mount_point:
+        print(f"错误: {target_device}2未挂载，请先挂载该分区")
+        print("\n按回车键返回主菜单...")
+        input()
+        return False
+    
+    # 确定源路径和目标路径
+    if model_type == 'embedding':
+        search_folder = 'embedding'
+        dst_dir = os.path.join(mount_point, 'dev', 'embedding')
+    elif model_type == 'reranker':
+        search_folder = 'reranker'
+        dst_dir = os.path.join(mount_point, 'dev', 'reranker')
+    else:
+        print("错误: 无效的模型类型")
+        return False
+    
+    # 查找Models_download或Models_Download文件夹
+    models_download_path = find_models_download_path(disk_path)
+    if not models_download_path:
+        print("错误: 未找到Models_download或Models_Download文件夹")
+        print("\n按回车键返回主菜单...")
+        input()
+        return False
+    
+    src_path = os.path.join(models_download_path, search_folder, model_name)
+    if not os.path.exists(src_path):
+        print(f"错误: 源模型路径不存在: {src_path}")
+        print("\n按回车键返回主菜单...")
+        input()
+        return False
+    
+    dst_path = os.path.join(dst_dir, model_name)
+    
+    print(f"\n正在拷贝{model_type}模型...")
+    print(f"源: {src_path}")
+    print(f"目标: {dst_path}")
+    
+    try:
+        # 如果目标文件夹已存在，先删除（覆盖）
+        if os.path.exists(dst_path):
+            print(f"目标文件夹已存在，将覆盖: {dst_path}")
+            shutil.rmtree(dst_path)
+        
+        # 使用进度条拷贝
+        copy_with_progress(src_path, dst_path, f"拷贝{model_type}模型 {model_name}")
+        print(f"{model_type}模型拷贝完成！")
+        return True
+    except PermissionError:
+        print(f"\n错误: 权限不足，无法拷贝文件")
+        print("请使用 sudo 运行程序：sudo python3 main.py")
+        print("\n按回车键返回主菜单...")
+        input()
+        return False
+    except Exception as e:
+        print(f"拷贝失败: {e}")
+        print("\n按回车键返回主菜单...")
+        input()
+        return False
+
+
+def copy_rag_config_file(model_type: str, model_name: str, config: Dict) -> bool:
+    """拷贝RAG模型的自动拉起配置文件
+    
+    Args:
+        model_type: 'embedding' 或 'reranker'
+        model_name: 模型文件夹名称
+        config: 配置字典
+    
+    Returns:
+        bool: 是否成功
+    """
+    disk_path = config.get('disk_path', '')
+    if not disk_path:
+        print("错误: 未设置硬盘路径，请先进行系统设置")
+        return False
+    
+    # 获取目标CFe-B卡设备
+    target_device = get_target_cfeb_device()
+    if not target_device:
+        print("错误: 未设置目标CFe-B卡，请先进行系统设置")
+        return False
+    
+    # 获取目标CFe-B卡第二个分区的挂载点（models分区）
+    mount_point = get_mount_point(f'{target_device}2')
+    if not mount_point:
+        print(f"错误: {target_device}2未挂载，请先挂载该分区")
+        return False
+    
+    # 确定源路径和目标路径
+    if model_type == 'embedding':
+        config_file = 'embedding_run.yaml'
+        dst_dir = os.path.join(mount_point, 'dev', 'embedding')
+    elif model_type == 'reranker':
+        config_file = 'reranker_run.yaml'
+        dst_dir = os.path.join(mount_point, 'dev', 'reranker')
+    else:
+        return False
+    
+    # 源路径：Model_dev_yaml/embedding或reranker/模型名称/配置文件
+    src_path = os.path.join(disk_path, 'Model_dev_yaml', model_type, model_name, config_file)
+    if not os.path.exists(src_path):
+        print(f"警告: 未找到配置文件: {src_path}")
+        return False
+    
+    dst_path = os.path.join(dst_dir, config_file)
+    
+    print(f"\n正在拷贝{model_type}配置文件...")
+    print(f"源: {src_path}")
+    print(f"目标: {dst_path}")
+    
+    try:
+        # 如果目标文件已存在，先删除（覆盖）
+        if os.path.exists(dst_path):
+            os.remove(dst_path)
+        
+        # 使用进度条拷贝
+        copy_with_progress(src_path, dst_path, f"拷贝{config_file}")
+        print(f"{config_file}拷贝完成！")
+        return True
+    except Exception as e:
+        print(f"拷贝配置文件失败: {e}")
+        return False
+
+
+def rag_model_configuration():
+    """制作与配置RAG模型"""
+    print("\n" + "="*50)
+    print("制作与配置RAG模型")
+    print("="*50)
+    
+    # 加载配置
+    config = load_config()
+    if not config.get('disk_path'):
+        print("\n错误: 未进行系统设置，请先进行系统设置")
+        print("\n按回车键返回主菜单...")
+        input()
+        return
+    
+    # 获取目标CFe-B卡设备
+    target_device = get_target_cfeb_device()
+    if not target_device:
+        print("错误: 未设置目标CFe-B卡，请先进行系统设置")
+        print("\n按回车键返回主菜单...")
+        input()
+        return
+    
+    # 验证目标CFe-B卡
+    if not verify_target_cfeb_card():
+        return
+    
+    # 拷贝auto和dev文件夹（如果还没有）
+    print("\n正在检查并拷贝auto和dev文件夹...")
+    if not copy_auto_and_dev_folders(config):
+        return
+    
+    while True:
+        print("\n=== 请选择操作 ===")
+        print()
+        print("1. 添加Embedding模型")
+        print()
+        print("2. 添加Reranker模型")
+        print()
+        print("3. 返回主菜单")
+        
+        choice = input("\n请选择功能 (1-3): ").strip()
+        
+        if choice == '1':
+            # 添加Embedding模型
+            disk_path = config.get('disk_path', '')
+            models = scan_rag_models(disk_path, 'embedding')
+            
+            if not models:
+                print("\n未找到Embedding模型")
+                print("请确保母版卡的Models_download或Models_Download/embedding文件夹下有包含'Embedding'关键词的模型文件夹")
+                print("\n按回车键返回...")
+                input()
+                continue
+            
+            print(f"\n找到 {len(models)} 个Embedding模型:")
+            for i, model in enumerate(models, 1):
+                print(f"  {i}. {model}")
+            
+            while True:
+                try:
+                    model_choice = int(input(f"\n请选择模型 (1-{len(models)}): ").strip())
+                    if 1 <= model_choice <= len(models):
+                        selected_model = models[model_choice - 1]
+                        break
+                    else:
+                        print(f"无效的选项，请输入1-{len(models)}之间的数字")
+                except ValueError:
+                    print("请输入有效的数字")
+            
+            # 拷贝模型
+            if copy_rag_model('embedding', selected_model, config):
+                # 询问是否创建自动拉起文件
+                print("\n是否需要创建自动拉起文件？(y/n): ", end='')
+                create_config = input().strip().lower()
+                if create_config in ['y', 'yes', '是']:
+                    copy_rag_config_file('embedding', selected_model, config)
+                
+                print("\n操作完成！")
+                print("按回车键返回...")
+                input()
+            else:
+                print("\n按回车键返回...")
+                input()
+        
+        elif choice == '2':
+            # 添加Reranker模型
+            disk_path = config.get('disk_path', '')
+            models = scan_rag_models(disk_path, 'reranker')
+            
+            if not models:
+                print("\n未找到Reranker模型")
+                print("请确保母版卡的Models_download或Models_Download/reranker文件夹下有包含'Rerank'或'Reranker'关键词的模型文件夹")
+                print("\n按回车键返回...")
+                input()
+                continue
+            
+            print(f"\n找到 {len(models)} 个Reranker模型:")
+            for i, model in enumerate(models, 1):
+                print(f"  {i}. {model}")
+            
+            while True:
+                try:
+                    model_choice = int(input(f"\n请选择模型 (1-{len(models)}): ").strip())
+                    if 1 <= model_choice <= len(models):
+                        selected_model = models[model_choice - 1]
+                        break
+                    else:
+                        print(f"无效的选项，请输入1-{len(models)}之间的数字")
+                except ValueError:
+                    print("请输入有效的数字")
+            
+            # 拷贝模型
+            if copy_rag_model('reranker', selected_model, config):
+                # 询问是否创建自动拉起文件
+                print("\n是否需要创建自动拉起文件？(y/n): ", end='')
+                create_config = input().strip().lower()
+                if create_config in ['y', 'yes', '是']:
+                    copy_rag_config_file('reranker', selected_model, config)
+                
+                print("\n操作完成！")
+                print("按回车键返回...")
+                input()
+            else:
+                print("\n按回车键返回...")
+                input()
+        
+        elif choice == '3':
+            return
+        else:
+            print("无效的选项，请重新选择")
+
+
+def set_full_disk_permissions():
+    """全盘加权功能：设置目标CFe-B卡的文件权限和所有者"""
+    print("\n" + "="*50)
+    print("全盘加权")
+    print("="*50)
+    
+    # 获取目标CFe-B卡设备
+    target_device = get_target_cfeb_device()
+    if not target_device:
+        print("错误: 未设置目标CFe-B卡，请先进行系统设置")
+        print("\n按回车键返回主菜单...")
+        input()
+        return
+    
+    # 获取目标CFe-B卡第一个分区的挂载点（rootfs分区）
+    rootfs_mount = get_mount_point(f'{target_device}1')
+    if not rootfs_mount:
+        print(f"错误: {target_device}1未挂载，请先挂载该分区")
+        print("\n按回车键返回主菜单...")
+        input()
+        return
+    
+    # 获取目标CFe-B卡第二个分区的挂载点（models分区）
+    models_mount = get_mount_point(f'{target_device}2')
+    if not models_mount:
+        print(f"错误: {target_device}2未挂载，请先挂载该分区")
+        print("\n按回车键返回主菜单...")
+        input()
+        return
+    
+    # 检查是否以root权限运行
+    try:
+        if os.geteuid() != 0:
+            print("\n错误: 此功能需要root权限")
+            print("请使用 sudo 运行程序：sudo python3 main.py")
+            print("\n按回车键返回主菜单...")
+            input()
+            return
+    except AttributeError:
+        # Windows系统没有geteuid
+        pass
+    
+    # 目标路径
+    autoShell_path = os.path.join(rootfs_mount, 'home', 'rm01', 'autoShell')
+    models_path = models_mount
+    
+    print(f"\n目标CFe-B卡: {target_device}")
+    print(f"rootfs分区挂载点: {rootfs_mount}")
+    print(f"models分区挂载点: {models_mount}")
+    print(f"\n将对以下路径执行权限设置：")
+    print(f"1. {autoShell_path}")
+    print(f"2. {models_path}")
+    print("\n操作内容：")
+    print("  - chmod 755 -R *")
+    print("  - chown -R rm01:rm01 *")
+    
+    # 确认操作
+    print("\n是否继续？(y/n): ", end='')
+    confirm = input().strip().lower()
+    if confirm not in ['y', 'yes', '是']:
+        print("操作已取消")
+        print("\n按回车键返回主菜单...")
+        input()
+        return
+    
+    success_count = 0
+    failed_paths = []
+    
+    # 处理 autoShell 目录
+    if os.path.exists(autoShell_path):
+        print(f"\n正在处理: {autoShell_path}")
+        try:
+            # chmod 755 -R
+            result = subprocess.run(['chmod', '-R', '755', autoShell_path], 
+                                  capture_output=True, text=True, check=True)
+            print("  ✓ chmod 755 完成")
+            
+            # chown -R rm01:rm01
+            result = subprocess.run(['chown', '-R', 'rm01:rm01', autoShell_path], 
+                                  capture_output=True, text=True, check=True)
+            print("  ✓ chown rm01:rm01 完成")
+            success_count += 1
+        except subprocess.CalledProcessError as e:
+            print(f"  ✗ 操作失败: {e.stderr.strip()}")
+            failed_paths.append(autoShell_path)
+        except Exception as e:
+            print(f"  ✗ 操作失败: {e}")
+            failed_paths.append(autoShell_path)
+    else:
+        print(f"\n警告: 路径不存在，跳过: {autoShell_path}")
+    
+    # 处理 models 分区
+    if os.path.exists(models_path):
+        print(f"\n正在处理: {models_path}")
+        try:
+            # chmod 755 -R
+            result = subprocess.run(['chmod', '-R', '755', models_path], 
+                                  capture_output=True, text=True, check=True)
+            print("  ✓ chmod 755 完成")
+            
+            # chown -R rm01:rm01
+            result = subprocess.run(['chown', '-R', 'rm01:rm01', models_path], 
+                                  capture_output=True, text=True, check=True)
+            print("  ✓ chown rm01:rm01 完成")
+            success_count += 1
+        except subprocess.CalledProcessError as e:
+            print(f"  ✗ 操作失败: {e.stderr.strip()}")
+            failed_paths.append(models_path)
+        except Exception as e:
+            print(f"  ✗ 操作失败: {e}")
+            failed_paths.append(models_path)
+    else:
+        print(f"\n警告: 路径不存在，跳过: {models_path}")
+    
+    # 显示结果
+    print("\n" + "="*50)
+    print("操作完成！")
+    print("="*50)
+    print(f"成功: {success_count}/2 个路径")
+    if failed_paths:
+        print(f"失败: {len(failed_paths)} 个路径")
+        print("失败的路径:")
+        for path in failed_paths:
+            print(f"  - {path}")
+    
+    print("\n按回车键返回主菜单...")
+    input()
+
+
 def main():
     """主函数"""
     # 检查root权限
@@ -1604,14 +2246,18 @@ def main():
         print()
         print("\033[1m3. 添加模型优化与推理加速配置文件 / Add Model Optimization Config\033[0m")
         print()
-        print("\033[1m4. 退出 / Exit\033[0m")
+        print("\033[1m4. 制作与配置RAG模型 / RAG Model Configuration\033[0m")
+        print()
+        print("\033[1m5. 全盘加权 / Set Full Disk Permissions\033[0m")
+        print()
+        print("\033[1m6. 退出 / Exit\033[0m")
         print()
         print()
         print("-"*50)
         print("Copyright RMinte 泛灵人工智能")
         print("-"*50)
         
-        choice = input("\n请选择功能 (1-4): ").strip()
+        choice = input("\n请选择功能 (1-6): ").strip()
         
         if choice == '1':
             system_settings()
@@ -1620,6 +2266,10 @@ def main():
         elif choice == '3':
             add_optimization_config_standalone()
         elif choice == '4':
+            rag_model_configuration()
+        elif choice == '5':
+            set_full_disk_permissions()
+        elif choice == '6':
             print("感谢使用！")
             # 卸载磁盘
             unmount_sda()
