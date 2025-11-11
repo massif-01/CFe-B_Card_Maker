@@ -712,6 +712,34 @@ def copy_backend(backend_type: str, config: Dict):
             shutil.rmtree(dst_path)
         copy_with_progress(src_path, dst_path, "拷贝后端文件")
         print("后端文件拷贝完成！")
+        
+        # 拷贝backend_list.yaml到目标CFe-B卡的models分区
+        backend_list_yaml_src = os.path.join(disk_path, '98autoshell', 'backend_list.yaml')
+        if os.path.exists(backend_list_yaml_src):
+            # 获取目标CFe-B卡第二个分区的挂载点（models分区）
+            models_mount = get_mount_point(f'{target_device}2')
+            if models_mount:
+                backend_list_yaml_dst_dir = os.path.join(models_mount, '98autoshell')
+                backend_list_yaml_dst = os.path.join(backend_list_yaml_dst_dir, 'backend_list.yaml')
+                
+                try:
+                    # 确保目标目录存在
+                    os.makedirs(backend_list_yaml_dst_dir, exist_ok=True)
+                    
+                    # 如果目标文件已存在，先删除（覆盖）
+                    if os.path.exists(backend_list_yaml_dst):
+                        os.remove(backend_list_yaml_dst)
+                    
+                    # 拷贝backend_list.yaml文件
+                    copy_with_progress(backend_list_yaml_src, backend_list_yaml_dst, "拷贝backend_list.yaml")
+                    print("✓ backend_list.yaml拷贝完成")
+                except Exception as e:
+                    print(f"⚠ 警告: 拷贝backend_list.yaml失败: {e}")
+            else:
+                print("⚠ 警告: 无法获取models分区挂载点，跳过backend_list.yaml拷贝")
+        else:
+            print("⚠ 警告: 未找到backend_list.yaml源文件，跳过拷贝")
+        
         return True
     except PermissionError:
         print(f"\n错误: 权限不足，无法拷贝文件")
@@ -728,53 +756,58 @@ def copy_backend(backend_type: str, config: Dict):
 
 def auto_detect_backend(model_name: str, config: Dict) -> Optional[str]:
     """根据模型名称自动检测后端类型"""
-    # 获取目标CFe-B卡设备
-    target_device = get_target_cfeb_device()
-    if not target_device:
-        print("错误: 未设置目标CFe-B卡，请先进行系统设置")
-        print("\n按回车键返回主菜单...")
-        input()
+    disk_path = config.get('disk_path', '')
+    if not disk_path:
+        print("错误: 未设置硬盘路径，请先进行系统设置")
         return None
     
-    # 获取目标CFe-B卡第二个分区的挂载点（models分区）
-    mount_point = get_mount_point(f'{target_device}2')
-    if not mount_point:
-        print(f"错误: {target_device}2未挂载，请先挂载该分区")
-        print("\n按回车键返回主菜单...")
-        input()
-        return None
+    # 只从母版卡读取backend_list.yaml
+    yaml_path = os.path.join(disk_path, '98autoshell', 'backend_list.yaml')
     
-    yaml_path = os.path.join(mount_point, '98autoshell', 'backend_list.yaml')
     if not os.path.exists(yaml_path):
         print(f"警告: 未找到backend_list.yaml: {yaml_path}")
-        return None
+        print("将使用默认后端：FlashAttention")
+        return 'FlashAttention'  # 默认返回FlashAttention
     
     try:
         with open(yaml_path, 'r', encoding='utf-8') as f:
             backend_list = yaml.safe_load(f)
         
         if not backend_list:
-            return None
+            print("警告: backend_list.yaml文件为空，使用默认后端：FlashAttention")
+            return 'FlashAttention'
+        
+        # 调试信息
+        print(f"调试信息: 正在查找模型 '{model_name}' 的后端类型")
+        print(f"调试信息: backend_list.yaml路径: {yaml_path}")
         
         # 检查模型在哪个后端列表中
         for backend, models in backend_list.items():
             if isinstance(models, list):
                 # 检查完整匹配或部分匹配
                 for m in models:
-                    if model_name == m or model_name in m or m in model_name:
+                    # 去除引号（如果有）
+                    m_clean = str(m).strip('"\'')
+                    if model_name == m_clean or model_name in m_clean or m_clean in model_name:
+                        print(f"调试信息: 找到匹配，模型 '{model_name}' 使用后端 '{backend}'")
                         return backend
             elif isinstance(models, str):
                 # 如果是字符串，尝试分割（支持逗号、空格等分隔符）
                 model_list = re.split(r'[,，\s]+', models.strip())
-                model_list = [m.strip() for m in model_list if m.strip()]
+                model_list = [m.strip().strip('"\'') for m in model_list if m.strip()]
                 for m in model_list:
                     if model_name == m or model_name in m or m in model_name:
+                        print(f"调试信息: 找到匹配，模型 '{model_name}' 使用后端 '{backend}'")
                         return backend
         
-        return None
+        print(f"调试信息: 未在backend_list.yaml中找到模型 '{model_name}'，使用默认后端：FlashAttention")
+        return 'FlashAttention'  # 默认返回FlashAttention
     except Exception as e:
         print(f"读取backend_list.yaml失败: {e}")
-        return None
+        import traceback
+        traceback.print_exc()
+        print("使用默认后端：FlashAttention")
+        return 'FlashAttention'  # 默认返回FlashAttention
 
 
 def select_manufacturer() -> str:
