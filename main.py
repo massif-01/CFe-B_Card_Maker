@@ -2150,7 +2150,7 @@ def rag_model_configuration():
 
 
 def set_full_disk_permissions():
-    """全盘加权功能：设置目标CFe-B卡的文件权限和所有者"""
+    """全盘加权功能：设置目标CFe-B卡的文件所有者"""
     print("\n" + "="*50)
     print("全盘加权")
     print("="*50)
@@ -2202,13 +2202,12 @@ def set_full_disk_permissions():
     print(f"\n目标CFe-B卡: {target_device}")
     print(f"rootfs分区挂载点: {rootfs_mount}")
     print(f"models分区挂载点: {models_mount}")
-    print(f"\n将对以下路径执行权限设置：")
+    print(f"\n将对以下路径执行所有者设置：")
     print(f"1. {autoShell_path}")
     print(f"2. {fused_moe_configs_path}")
     print(f"3. {rootfs_partition_path} (整个rootfs分区)")
     print(f"4. {models_path}")
     print("\n操作内容：")
-    print("  - chmod 755 -R *")
     print("  - chown -R rm01:rm01 *")
     
     # 确认操作
@@ -2227,11 +2226,6 @@ def set_full_disk_permissions():
     if os.path.exists(autoShell_path):
         print(f"\n正在处理: {autoShell_path}")
         try:
-            # chmod 755 -R
-            result = subprocess.run(['chmod', '-R', '755', autoShell_path], 
-                                  capture_output=True, text=True, check=True)
-            print("  ✓ chmod 755 完成")
-            
             # chown -R rm01:rm01
             result = subprocess.run(['chown', '-R', 'rm01:rm01', autoShell_path], 
                                   capture_output=True, text=True, check=True)
@@ -2250,11 +2244,6 @@ def set_full_disk_permissions():
     if os.path.exists(fused_moe_configs_path):
         print(f"\n正在处理: {fused_moe_configs_path}")
         try:
-            # chmod 755 -R
-            result = subprocess.run(['chmod', '-R', '755', fused_moe_configs_path], 
-                                  capture_output=True, text=True, check=True)
-            print("  ✓ chmod 755 完成")
-            
             # chown -R rm01:rm01
             result = subprocess.run(['chown', '-R', 'rm01:rm01', fused_moe_configs_path], 
                                   capture_output=True, text=True, check=True)
@@ -2273,11 +2262,6 @@ def set_full_disk_permissions():
     if os.path.exists(rootfs_partition_path):
         print(f"\n正在处理: {rootfs_partition_path} (整个rootfs分区)")
         try:
-            # chmod 755 -R
-            result = subprocess.run(['chmod', '-R', '755', rootfs_partition_path], 
-                                  capture_output=True, text=True, check=True)
-            print("  ✓ chmod 755 完成")
-            
             # chown -R rm01:rm01
             result = subprocess.run(['chown', '-R', 'rm01:rm01', rootfs_partition_path], 
                                   capture_output=True, text=True, check=True)
@@ -2296,11 +2280,6 @@ def set_full_disk_permissions():
     if os.path.exists(models_path):
         print(f"\n正在处理: {models_path}")
         try:
-            # chmod 755 -R
-            result = subprocess.run(['chmod', '-R', '755', models_path], 
-                                  capture_output=True, text=True, check=True)
-            print("  ✓ chmod 755 完成")
-            
             # chown -R rm01:rm01
             result = subprocess.run(['chown', '-R', 'rm01:rm01', models_path], 
                                   capture_output=True, text=True, check=True)
