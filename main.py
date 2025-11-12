@@ -2191,12 +2191,12 @@ def set_full_disk_permissions():
         # Windows系统没有geteuid
         pass
     
-    # 目标路径
+    # 目标路径（只对用户目录和特定目录执行chown，避免影响系统文件）
     autoShell_path = os.path.join(rootfs_mount, 'home', 'rm01', 'autoShell')
     fused_moe_configs_path = os.path.join(rootfs_mount, 'home', 'rm01', 'miniconda3', 'envs', 'vllm', 
                                           'lib', 'python3.12', 'site-packages', 'vllm', 
                                           'model_executor', 'layers', 'fused_moe', 'configs')
-    rootfs_partition_path = rootfs_mount  # 整个rootfs分区
+    rm01_home_path = os.path.join(rootfs_mount, 'home', 'rm01')  # rm01用户主目录
     models_path = models_mount
     
     print(f"\n目标CFe-B卡: {target_device}")
@@ -2205,10 +2205,11 @@ def set_full_disk_permissions():
     print(f"\n将对以下路径执行所有者设置：")
     print(f"1. {autoShell_path}")
     print(f"2. {fused_moe_configs_path}")
-    print(f"3. {rootfs_partition_path} (整个rootfs分区)")
+    print(f"3. {rm01_home_path} (rm01用户主目录)")
     print(f"4. {models_path}")
     print("\n操作内容：")
     print("  - chown -R rm01:rm01 *")
+    print("\n注意: 为避免影响系统文件，不会对整个rootfs分区执行chown操作")
     
     # 确认操作
     print("\n是否继续？(y/n): ", end='')
@@ -2258,23 +2259,23 @@ def set_full_disk_permissions():
     else:
         print(f"\n警告: 路径不存在，跳过: {fused_moe_configs_path}")
     
-    # 处理整个 rootfs 分区
-    if os.path.exists(rootfs_partition_path):
-        print(f"\n正在处理: {rootfs_partition_path} (整个rootfs分区)")
+    # 处理 rm01 用户主目录（而不是整个rootfs分区，避免影响系统文件）
+    if os.path.exists(rm01_home_path):
+        print(f"\n正在处理: {rm01_home_path} (rm01用户主目录)")
         try:
             # chown -R rm01:rm01
-            result = subprocess.run(['chown', '-R', 'rm01:rm01', rootfs_partition_path], 
+            result = subprocess.run(['chown', '-R', 'rm01:rm01', rm01_home_path], 
                                   capture_output=True, text=True, check=True)
             print("  ✓ chown rm01:rm01 完成")
             success_count += 1
         except subprocess.CalledProcessError as e:
             print(f"  ✗ 操作失败: {e.stderr.strip()}")
-            failed_paths.append(rootfs_partition_path)
+            failed_paths.append(rm01_home_path)
         except Exception as e:
             print(f"  ✗ 操作失败: {e}")
-            failed_paths.append(rootfs_partition_path)
+            failed_paths.append(rm01_home_path)
     else:
-        print(f"\n警告: 路径不存在，跳过: {rootfs_partition_path}")
+        print(f"\n警告: 路径不存在，跳过: {rm01_home_path}")
     
     # 处理 models 分区
     if os.path.exists(models_path):
@@ -2299,6 +2300,7 @@ def set_full_disk_permissions():
     print("操作完成！")
     print("="*50)
     print(f"成功: {success_count}/4 个路径")
+    print("\n注意: 为避免影响系统文件（如sudo），未对整个rootfs分区执行chown操作")
     if failed_paths:
         print(f"失败: {len(failed_paths)} 个路径")
         print("失败的路径:")
