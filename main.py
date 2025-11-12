@@ -2149,8 +2149,35 @@ def rag_model_configuration():
             print("无效的选项，请重新选择")
 
 
+def set_script_executable_permissions(directory: str):
+    """递归设置目录下所有脚本文件的执行权限
+    
+    Args:
+        directory: 目录路径
+    """
+    script_extensions = ['.sh', '.py']
+    script_count = 0
+    
+    try:
+        for root, dirs, files in os.walk(directory):
+            for file in files:
+                file_path = os.path.join(root, file)
+                # 检查是否是脚本文件
+                if any(file.endswith(ext) for ext in script_extensions):
+                    try:
+                        # 设置执行权限（chmod +x）
+                        os.chmod(file_path, os.stat(file_path).st_mode | 0o111)
+                        script_count += 1
+                    except Exception as e:
+                        # 忽略权限设置失败的文件
+                        pass
+        return script_count
+    except Exception:
+        return script_count
+
+
 def set_full_disk_permissions():
-    """全盘加权功能：设置目标CFe-B卡的文件所有者"""
+    """全盘加权功能：设置目标CFe-B卡的文件所有者和脚本执行权限"""
     print("\n" + "="*50)
     print("全盘加权")
     print("="*50)
@@ -2209,6 +2236,7 @@ def set_full_disk_permissions():
     print(f"4. {models_path}")
     print("\n操作内容：")
     print("  - chown -R rm01:rm01 *")
+    print("  - chmod +x 所有脚本文件（.sh, .py）")
     print("\n注意: 为避免影响系统文件，不会对整个rootfs分区执行chown操作")
     
     # 确认操作
@@ -2231,6 +2259,12 @@ def set_full_disk_permissions():
             result = subprocess.run(['chown', '-R', 'rm01:rm01', autoShell_path], 
                                   capture_output=True, text=True, check=True)
             print("  ✓ chown rm01:rm01 完成")
+            
+            # 设置脚本文件执行权限
+            script_count = set_script_executable_permissions(autoShell_path)
+            if script_count > 0:
+                print(f"  ✓ 已为 {script_count} 个脚本文件设置执行权限")
+            
             success_count += 1
         except subprocess.CalledProcessError as e:
             print(f"  ✗ 操作失败: {e.stderr.strip()}")
@@ -2267,6 +2301,12 @@ def set_full_disk_permissions():
             result = subprocess.run(['chown', '-R', 'rm01:rm01', rm01_home_path], 
                                   capture_output=True, text=True, check=True)
             print("  ✓ chown rm01:rm01 完成")
+            
+            # 设置脚本文件执行权限（只对用户目录下的脚本）
+            script_count = set_script_executable_permissions(rm01_home_path)
+            if script_count > 0:
+                print(f"  ✓ 已为 {script_count} 个脚本文件设置执行权限")
+            
             success_count += 1
         except subprocess.CalledProcessError as e:
             print(f"  ✗ 操作失败: {e.stderr.strip()}")
@@ -2285,6 +2325,12 @@ def set_full_disk_permissions():
             result = subprocess.run(['chown', '-R', 'rm01:rm01', models_path], 
                                   capture_output=True, text=True, check=True)
             print("  ✓ chown rm01:rm01 完成")
+            
+            # 设置脚本文件执行权限
+            script_count = set_script_executable_permissions(models_path)
+            if script_count > 0:
+                print(f"  ✓ 已为 {script_count} 个脚本文件设置执行权限")
+            
             success_count += 1
         except subprocess.CalledProcessError as e:
             print(f"  ✗ 操作失败: {e.stderr.strip()}")
