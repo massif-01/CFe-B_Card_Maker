@@ -2177,7 +2177,12 @@ def set_script_executable_permissions(directory: str):
 
 
 def set_full_disk_permissions():
-    """全盘加权功能：设置目标CFe-B卡的文件所有者和脚本执行权限"""
+    """全盘加权功能：设置目标CFe-B卡的文件所有者和脚本执行权限
+    
+    只对以下两个路径进行加权，避免影响系统文件：
+    1. /home/rm01/autoShell - rootfs分区上的autoShell目录
+    2. models分区 - 整个models分区
+    """
     print("\n" + "="*50)
     print("全盘加权")
     print("="*50)
@@ -2218,12 +2223,8 @@ def set_full_disk_permissions():
         # Windows系统没有geteuid
         pass
     
-    # 目标路径（只对用户目录和特定目录执行chown，避免影响系统文件）
+    # 目标路径（只对这两个目录执行chown，避免影响系统文件如sudo）
     autoShell_path = os.path.join(rootfs_mount, 'home', 'rm01', 'autoShell')
-    fused_moe_configs_path = os.path.join(rootfs_mount, 'home', 'rm01', 'miniconda3', 'envs', 'vllm', 
-                                          'lib', 'python3.12', 'site-packages', 'vllm', 
-                                          'model_executor', 'layers', 'fused_moe', 'configs')
-    rm01_home_path = os.path.join(rootfs_mount, 'home', 'rm01')  # rm01用户主目录
     models_path = models_mount
     
     print(f"\n目标CFe-B卡: {target_device}")
@@ -2231,13 +2232,11 @@ def set_full_disk_permissions():
     print(f"models分区挂载点: {models_mount}")
     print(f"\n将对以下路径执行所有者设置：")
     print(f"1. {autoShell_path}")
-    print(f"2. {fused_moe_configs_path}")
-    print(f"3. {rm01_home_path} (rm01用户主目录)")
-    print(f"4. {models_path}")
+    print(f"2. {models_path}")
     print("\n操作内容：")
     print("  - chown -R rm01:rm01 *")
     print("  - chmod +x 所有脚本文件（.sh, .py）")
-    print("\n注意: 为避免影响系统文件，不会对整个rootfs分区执行chown操作")
+    print("\n注意: 只对autoShell目录和models分区加权，不会影响系统文件")
     
     # 确认操作
     print("\n是否继续？(y/n): ", end='')
@@ -2250,6 +2249,7 @@ def set_full_disk_permissions():
     
     success_count = 0
     failed_paths = []
+    total_paths = 2
     
     # 处理 autoShell 目录
     if os.path.exists(autoShell_path):
@@ -2274,48 +2274,6 @@ def set_full_disk_permissions():
             failed_paths.append(autoShell_path)
     else:
         print(f"\n警告: 路径不存在，跳过: {autoShell_path}")
-    
-    # 处理 fused_moe/configs 目录
-    if os.path.exists(fused_moe_configs_path):
-        print(f"\n正在处理: {fused_moe_configs_path}")
-        try:
-            # chown -R rm01:rm01
-            result = subprocess.run(['chown', '-R', 'rm01:rm01', fused_moe_configs_path], 
-                                  capture_output=True, text=True, check=True)
-            print("  ✓ chown rm01:rm01 完成")
-            success_count += 1
-        except subprocess.CalledProcessError as e:
-            print(f"  ✗ 操作失败: {e.stderr.strip()}")
-            failed_paths.append(fused_moe_configs_path)
-        except Exception as e:
-            print(f"  ✗ 操作失败: {e}")
-            failed_paths.append(fused_moe_configs_path)
-    else:
-        print(f"\n警告: 路径不存在，跳过: {fused_moe_configs_path}")
-    
-    # 处理 rm01 用户主目录（而不是整个rootfs分区，避免影响系统文件）
-    if os.path.exists(rm01_home_path):
-        print(f"\n正在处理: {rm01_home_path} (rm01用户主目录)")
-        try:
-            # chown -R rm01:rm01
-            result = subprocess.run(['chown', '-R', 'rm01:rm01', rm01_home_path], 
-                                  capture_output=True, text=True, check=True)
-            print("  ✓ chown rm01:rm01 完成")
-            
-            # 设置脚本文件执行权限（只对用户目录下的脚本）
-            script_count = set_script_executable_permissions(rm01_home_path)
-            if script_count > 0:
-                print(f"  ✓ 已为 {script_count} 个脚本文件设置执行权限")
-            
-            success_count += 1
-        except subprocess.CalledProcessError as e:
-            print(f"  ✗ 操作失败: {e.stderr.strip()}")
-            failed_paths.append(rm01_home_path)
-        except Exception as e:
-            print(f"  ✗ 操作失败: {e}")
-            failed_paths.append(rm01_home_path)
-    else:
-        print(f"\n警告: 路径不存在，跳过: {rm01_home_path}")
     
     # 处理 models 分区
     if os.path.exists(models_path):
@@ -2345,8 +2303,7 @@ def set_full_disk_permissions():
     print("\n" + "="*50)
     print("操作完成！")
     print("="*50)
-    print(f"成功: {success_count}/4 个路径")
-    print("\n注意: 为避免影响系统文件（如sudo），未对整个rootfs分区执行chown操作")
+    print(f"成功: {success_count}/{total_paths} 个路径")
     if failed_paths:
         print(f"失败: {len(failed_paths)} 个路径")
         print("失败的路径:")
