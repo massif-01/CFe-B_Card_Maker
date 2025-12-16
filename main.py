@@ -1834,10 +1834,8 @@ def scan_rag_models(disk_path: str, model_type: str) -> List[str]:
     """
     if model_type == 'embedding':
         search_folder = 'embedding'
-        keywords = ['Embedding', 'embedding']
     elif model_type == 'reranker':
         search_folder = 'reranker'
-        keywords = ['Rerank', 'Reranker', 'rerank', 'reranker']
     else:
         return []
     
@@ -1855,13 +1853,12 @@ def scan_rag_models(disk_path: str, model_type: str) -> List[str]:
         for item in os.listdir(target_folder):
             item_path = os.path.join(target_folder, item)
             if os.path.isdir(item_path):
-                # 检查文件夹名称是否包含关键词
-                if any(keyword in item for keyword in keywords):
-                    models.append(item)
+                # 扫描所有子文件夹作为模型
+                models.append(item)
     except Exception:
         return []
     
-    return models
+    return sorted(models)
 
 
 def copy_rag_model(model_type: str, model_name: str, config: Dict) -> bool:
