@@ -356,21 +356,23 @@ def find_target_cfeb_card() -> Optional[str]:
     
     # 检查每个磁盘
     for disk_device in disk_devices:
-        # 检查是否有三个分区
+        # 检查是否有必需的分区（rootfs和models，app可选）
         partitions = {
             'rootfs': f'{disk_device}1',
             'models': f'{disk_device}2',
             'app': f'{disk_device}3'
         }
         
-        # 检查分区是否存在
-        missing_partitions = []
-        for name, path in partitions.items():
+        # 检查必需的分区是否存在（rootfs和models）
+        required_partitions = ['rootfs', 'models']
+        missing_required = []
+        for name in required_partitions:
+            path = partitions[name]
             if not os.path.exists(path):
-                missing_partitions.append(name)
+                missing_required.append(name)
         
-        if missing_partitions:
-            continue  # 跳过没有三个分区的磁盘
+        if missing_required:
+            continue  # 跳过没有必需分区的磁盘
         
         # 检查分区标签和挂载点
         partition_labels = {}
@@ -402,11 +404,10 @@ def find_target_cfeb_card() -> Optional[str]:
             continue  # 跳过模型母版盘
         
         # 检查标签是否符合要求（支持多种格式）
-        # 期望的标签关键词
+        # 期望的标签关键词（只检查rootfs和models，app可选）
         expected_keywords = {
             'rootfs': ['rootfs'],
-            'models': ['models'],
-            'app': ['app']
+            'models': ['models']
         }
         
         # 检查标签是否匹配（支持完全匹配或包含关键词）
@@ -446,7 +447,7 @@ def confirm_cfeb_card() -> bool:
     
     if not disk_device:
         print("\n未找到完全对应的目标CFe-B卡")
-        print("请检查硬件连接，确保目标CFe-B卡已正确插入（分区标签应为: rootfs, models, app）")
+        print("请检查硬件连接，确保目标CFe-B卡已正确插入（分区标签应为: rootfs, models，app可选）")
         print("按回车键返回系统设置菜单...")
         input()
         return False
@@ -1293,7 +1294,7 @@ def verify_target_cfeb_card() -> bool:
     
     if not disk_device:
         print("\n未找到完全对应的目标CFe-B卡")
-        print("请检查硬件连接，确保目标CFe-B卡已正确插入（分区标签应为: rootfs, models, app）")
+        print("请检查硬件连接，确保目标CFe-B卡已正确插入（分区标签应为: rootfs, models，app可选）")
         print("按回车键返回主菜单...")
         input()
         return False
